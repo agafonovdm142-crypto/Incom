@@ -1,12 +1,10 @@
 services:
-  - type: web
+  - type: worker
     plan: free
     name: autodkp-bot
     runtime: python
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "python bot/telegram_bot_unified.py"
+    startCommand: "python telegram_bot.py"
     envVars:
       - key: BOT_TOKEN
-        sync: false
-      - key: PYTHON_VERSION
-        value: 3.11.0
+        value: 8764706036:AAHJ0jrn1A0PwCBzldIvoyTx20FpCZd8ELg
