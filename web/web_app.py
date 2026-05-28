@@ -1,10 +1,9 @@
 """
 💻 АвтоДКП Веб — Streamlit интерфейс для автоматизации ДКП
-Версия: 2.0 | Улучшенная навигация и обработка ошибок
+Версия: 2.1 | Исправленная (без сложного HTML)
 """
 
 import streamlit as st
-import json
 from datetime import datetime
 
 # ── Настройка страницы ──
@@ -14,26 +13,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# ── CSS стили ──
-st.markdown("""
-<style>
-    .main-header { font-size: 2.5rem; font-weight: bold; color: #1f77b4; margin-bottom: 1rem; }
-    .status-badge { padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600; }
-    .status-draft { background: #fff3cd; color: #856404; }
-    .status-check { background: #d1ecf1; color: #0c5460; }
-    .status-signed { background: #d4edda; color: #155724; }
-    .status-done { background: #d4edda; color: #155724; }
-    .card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px; }
-    .field-label { font-size: 0.75rem; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
-    .field-value { font-size: 1rem; font-weight: 500; color: #333; }
-    .step-active { background: #1f77b4; color: white; padding: 8px 16px; border-radius: 20px; }
-    .step-inactive { background: #f0f0f0; color: #666; padding: 8px 16px; border-radius: 20px; }
-    .success-box { background: #d4edda; border: 1px solid #155724; padding: 15px; border-radius: 8px; }
-    .warning-box { background: #fff3cd; border: 1px solid #856404; padding: 15px; border-radius: 8px; }
-    .error-box { background: #f8d7da; border: 1px solid #721c24; padding: 15px; border-radius: 8px; }
-</style>
-""", unsafe_allow_html=True)
 
 # ── Инициализация состояния ──
 def init_session():
@@ -86,31 +65,28 @@ def init_session():
                 "escrow": {"company": "ООО «Домклик»", "bank": "ПАО ВТБ", "bik": "044525187"}
             }
         ]
-
     if 'current_deal' not in st.session_state:
         st.session_state.current_deal = None
-
     if 'new_deal_step' not in st.session_state:
         st.session_state.new_deal_step = 1
-
     if 'new_deal_data' not in st.session_state:
         st.session_state.new_deal_data = {}
 
 init_session()
 
 # ── Боковое меню ──
-st.sidebar.markdown("<div class='main-header'>🏠 АвтоДКП</div>", unsafe_allow_html=True)
-st.sidebar.markdown("Автоматизация договоров купли-продажи")
-st.sidebar.markdown("---")
+st.sidebar.title("🏠 АвтоДКP")
+st.sidebar.caption("Автоматизация договоров")
+st.sidebar.divider()
 
 menu = st.sidebar.radio(
     "Навигация",
     ["📋 Мои сделки", "➕ Новая сделка", "⚙️ Настройки", "❓ Помощь"]
 )
 
-st.sidebar.markdown("---")
-st.sidebar.markdown("**Олеся** — Риелтор | Москва")
-st.sidebar.markdown("📱 Бот: @AvtoDKP1_bot")
+st.sidebar.divider()
+st.sidebar.info("**Олеся** — Риелтор | Москва")
+st.sidebar.info("📱 Бот: @AvtoDKP1_bot")
 
 # ═══════════════════════════════════════════════════════════════
 # ФУНКЦИИ-ПОМОЩНИКИ
@@ -119,21 +95,30 @@ st.sidebar.markdown("📱 Бот: @AvtoDKP1_bot")
 def format_price(price):
     return f"{price:,}".replace(",", " ")
 
-def get_status_badge(status):
-    status_map = {
-        "draft": ("Черновик", "status-draft"),
-        "check": ("На проверке", "status-check"),
-        "signed": ("Подписан", "status-signed"),
-        "done": ("Завершён", "status-done")
+def get_status_color(status):
+    colors = {
+        "draft": "🟡",
+        "check": "🔵",
+        "signed": "🟢",
+        "done": "✅"
     }
-    return status_map.get(status, (status, "status-draft"))
+    return colors.get(status, "⚪")
+
+def get_status_text(status):
+    texts = {
+        "draft": "Черновик",
+        "check": "На проверке",
+        "signed": "Подписан",
+        "done": "Завершён"
+    }
+    return texts.get(status, status)
 
 # ═══════════════════════════════════════════════════════════════
 # СТРАНИЦА: МОИ СДЕЛКИ
 # ═══════════════════════════════════════════════════════════════
 
 if menu == "📋 Мои сделки" and not st.session_state.current_deal:
-    st.markdown("<div class='main-header'>📋 Мои сделки</div>", unsafe_allow_html=True)
+    st.title("📋 Мои сделки")
 
     # Фильтры
     col1, col2, col3 = st.columns([2, 2, 1])
@@ -142,22 +127,21 @@ if menu == "📋 Мои сделки" and not st.session_state.current_deal:
     with col2:
         search = st.text_input("Поиск по адресу или ФИО")
     with col3:
-        st.markdown("<br>", unsafe_allow_html=True)
+        st.write("")
+        st.write("")
         if st.button("➕ Новая", use_container_width=True, type="primary"):
             st.session_state.current_deal = "new"
             st.session_state.new_deal_step = 1
             st.session_state.new_deal_data = {}
             st.rerun()
 
-    st.markdown("---")
+    st.divider()
 
-    # Фильтрация сделок
+    # Фильтрация
     filtered_deals = st.session_state.deals
     if status_filter != "Все":
-        status_map_reverse = {"Черновик": "draft", "На проверке": "check", 
-                             "Подписан": "signed", "Завершён": "done"}
-        filtered_deals = [d for d in filtered_deals if d['status'] == status_map_reverse.get(status_filter)]
-
+        status_map = {"Черновик": "draft", "На проверке": "check", "Подписан": "signed", "Завершён": "done"}
+        filtered_deals = [d for d in filtered_deals if d['status'] == status_map.get(status_filter)]
     if search:
         filtered_deals = [d for d in filtered_deals if 
                          search.lower() in d['property']['address'].lower() or
@@ -169,51 +153,25 @@ if menu == "📋 Мои сделки" and not st.session_state.current_deal:
         st.info("📭 Сделок не найдено. Создайте новую сделку!")
     else:
         for deal in filtered_deals:
-            status_text, status_class = get_status_badge(deal['status'])
-
-            with st.container():
+            with st.container(border=True):
                 col1, col2, col3, col4, col5 = st.columns([2, 2, 2, 1, 1])
 
                 with col1:
-                    st.markdown(f"""
-                    <div class='card'>
-                        <div class='field-label'>№ СДЕЛКИ</div>
-                        <div class='field-value'>{deal['id']}</div>
-                        <div style='margin-top: 8px;'>
-                            <span class='status-badge {status_class}'>{status_text}</span>
-                        </div>
-                        <div class='field-label' style='margin-top: 8px;'>{deal['date']}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.subheader(deal['id'])
+                    st.caption(f"{get_status_color(deal['status'])} {get_status_text(deal['status'])} | {deal['date']}")
 
                 with col2:
-                    st.markdown(f"""
-                    <div class='card'>
-                        <div class='field-label'>ПРОДАВЕЦ → ПОКУПАТЕЛЬ</div>
-                        <div class='field-value'>{deal['seller']['full_name']}</div>
-                        <div class='field-value'>→ {deal['buyer']['full_name']}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.write(f"**Продавец:** {deal['seller']['full_name']}")
+                    st.write(f"**→ Покупатель:** {deal['buyer']['full_name']}")
 
                 with col3:
-                    st.markdown(f"""
-                    <div class='card'>
-                        <div class='field-label'>ОБЪЕКТ | ЦЕНА</div>
-                        <div class='field-value'>{deal['property']['address']}</div>
-                        <div class='field-value' style='color: #1f77b4; font-weight: bold;'>
-                            {format_price(deal['price']['total'])} ₽
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.write(f"**📍** {deal['property']['address']}")
+                    st.write(f"**💰** {format_price(deal['price']['total'])} ₽")
 
                 with col4:
-                    st.markdown(f"""
-                    <div class='card' style='text-align: center;'>
-                        <div class='field-label'>КАДАСТР</div>
-                        <div class='field-value' style='font-size: 0.85rem;'>{deal['property']['cadastral']}</div>
-                        <div class='field-label' style='margin-top: 8px;'>{deal['property']['area']} м²</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.write(f"**Кадастр:**")
+                    st.write(deal['property']['cadastral'])
+                    st.write(f"{deal['property']['area']} м²")
 
                 with col5:
                     if st.button("Открыть", key=f"open_{deal['id']}", use_container_width=True):
@@ -232,21 +190,20 @@ elif st.session_state.current_deal and st.session_state.current_deal != "new":
     if deal:
         col1, col2, col3 = st.columns([3, 2, 1])
         with col1:
-            st.markdown(f"<div class='main-header'>{deal['id']}</div>", unsafe_allow_html=True)
+            st.title(deal['id'])
         with col2:
-            status_text, status_class = get_status_badge(deal['status'])
-            st.markdown(f"<span class='status-badge {status_class}'>{status_text}</span>", unsafe_allow_html=True)
+            st.write(f"### {get_status_color(deal['status'])} {get_status_text(deal['status'])}")
         with col3:
             if st.button("◀️ Назад", use_container_width=True):
                 st.session_state.current_deal = None
                 st.rerun()
 
-        st.markdown("---")
+        st.divider()
 
         tab1, tab2, tab3, tab4 = st.tabs(["📄 Договор", "👤 Стороны", "🏠 Объект", "💰 Расчёты"])
 
         with tab1:
-            st.markdown("### 📄 Текст договора")
+            st.header("📄 Текст договора")
 
             col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
             with col1:
@@ -260,16 +217,15 @@ elif st.session_state.current_deal and st.session_state.current_deal != "new":
                     st.session_state.edit_mode = True
             with col4:
                 if st.button("📤 Отправить на подписание", type="primary", use_container_width=True):
-                    st.success("✅ Договор отправлен сторонам на согласование!")
+                    st.success("✅ Договор отправлен сторонам!")
 
-            contract_preview = f"""
-ДОГОВОР КУПЛИ-ПРОДАЖИ КВАРТИРЫ
+            contract_preview = f"""ДОГОВОР КУПЛИ-ПРОДАЖИ КВАРТИРЫ
 
 г. Москва                                                                               {deal['date']}
 
     {deal['seller']['full_name']}, именуемый в дальнейшем «Продавец», с одной стороны, и
     {deal['buyer']['full_name']}, именуемый в дальнейшем «Покупатель», с другой стороны,
-    совместно именуемые «Стороны», заключили настоящий договор (далее — «Договор») о нижеследующем:
+    совместно именуемые «Стороны», заключили настоящий договор о нижеследующем:
 
 1. ПРЕДМЕТ ДОГОВОРА
 
@@ -280,7 +236,7 @@ elif st.session_state.current_deal and st.session_state.current_deal != "new":
 
 2. ЦЕНА И ПОРЯДОК РАСЧЁТОВ
 
-2.1. Общая цена: {format_price(deal['price']['total'])} ({format_price(deal['price']['total'])}) рублей 00 копеек.
+2.1. Общая цена: {format_price(deal['price']['total'])} рублей 00 копеек.
 
 2.2. Аванс (задаток): {format_price(deal['price']['advance'])} руб.
     Основной платёж: {format_price(deal['price']['main_payment'])} руб.
@@ -292,26 +248,25 @@ elif st.session_state.current_deal and st.session_state.current_deal != "new":
 
 3. ПРАВА И ОБЯЗАННОСТИ СТОРОН
 
-3.1. Продавец обязуется передать квартиру в течение 30 дней с момента подписания.
-3.2. Покупатель обязуется оплатить полную стоимость до момента регистрации перехода права.
+3.1. Продавец обязуется передать квартиру в течение 30 дней.
+3.2. Покупатель обязуется оплатить полную стоимость до регистрации.
 
 4. ПОДПИСИ СТОРОН
 
     _________________ / {deal['seller']['full_name']} /          _________________ / {deal['buyer']['full_name']} /
-           (Подпись)                                                   (Подпись)
-"""
-            st.text_area("", value=contract_preview, height=500)
+           (Подпись)                                                   (Подпись)"""
+            st.text_area("", value=contract_preview, height=500, label_visibility="collapsed")
 
         with tab2:
             col1, col2 = st.columns(2)
             with col1:
-                st.markdown("#### 👤 Продавец")
+                st.subheader("👤 Продавец")
                 st.text_input("ФИО", value=deal['seller'].get('full_name', ''), key="s_fio")
                 st.text_input("Дата рождения", value=deal['seller'].get('birth_date', ''), key="s_bd")
-                col_s1, col_s2 = st.columns(2)
-                with col_s1:
+                c1, c2 = st.columns(2)
+                with c1:
                     st.text_input("Серия", value=deal['seller'].get('passport_series', ''), key="s_ser")
-                with col_s2:
+                with c2:
                     st.text_input("Номер", value=deal['seller'].get('passport_number', ''), key="s_num")
                 st.text_input("Кем выдан", value=deal['seller'].get('passport_issued_by', ''), key="s_iss")
                 st.text_input("Дата выдачи", value=deal['seller'].get('passport_issued_date', ''), key="s_id")
@@ -320,13 +275,13 @@ elif st.session_state.current_deal and st.session_state.current_deal != "new":
                     st.success("✅ Данные продавца сохранены")
 
             with col2:
-                st.markdown("#### 👤 Покупатель")
+                st.subheader("👤 Покупатель")
                 st.text_input("ФИО", value=deal['buyer'].get('full_name', ''), key="b_fio")
                 st.text_input("Дата рождения", value=deal['buyer'].get('birth_date', ''), key="b_bd")
-                col_b1, col_b2 = st.columns(2)
-                with col_b1:
+                c1, c2 = st.columns(2)
+                with c1:
                     st.text_input("Серия", value=deal['buyer'].get('passport_series', ''), key="b_ser")
-                with col_b2:
+                with c2:
                     st.text_input("Номер", value=deal['buyer'].get('passport_number', ''), key="b_num")
                 st.text_input("Кем выдан", value=deal['buyer'].get('passport_issued_by', ''), key="b_iss")
                 st.text_input("Дата выдачи", value=deal['buyer'].get('passport_issued_date', ''), key="b_id")
@@ -335,13 +290,13 @@ elif st.session_state.current_deal and st.session_state.current_deal != "new":
                     st.success("✅ Данные покупателя сохранены")
 
         with tab3:
-            st.markdown("#### 🏠 Объект недвижимости")
-            col1, col2 = st.columns(2)
-            with col1:
+            st.subheader("🏠 Объект недвижимости")
+            c1, c2 = st.columns(2)
+            with c1:
                 st.text_input("Тип", value="Квартира", key="prop_type")
                 st.text_input("Адрес", value=deal['property']['address'], key="prop_addr")
                 st.text_input("Кадастровый номер", value=deal['property']['cadastral'], key="prop_cad")
-            with col2:
+            with c2:
                 st.number_input("Площадь (м²)", value=float(deal['property']['area']), key="prop_area")
                 st.number_input("Этаж", value=int(deal['property'].get('floor', 1)), key="prop_floor")
                 st.number_input("Комнат", value=int(deal['property'].get('rooms', 1)), key="prop_rooms")
@@ -354,28 +309,30 @@ elif st.session_state.current_deal and st.session_state.current_deal != "new":
                 st.success("✅ Данные объекта сохранены")
 
         with tab4:
-            st.markdown("#### 💰 Цена и расчёты")
-            col1, col2, col3 = st.columns(3)
-            with col1:
+            st.subheader("💰 Цена и расчёты")
+            c1, c2, c3 = st.columns(3)
+            with c1:
                 new_price = st.number_input("Цена", value=deal['price']['total'], key="price_total")
-            with col2:
+            with c2:
                 new_advance = st.number_input("Аванс", value=deal['price']['advance'], key="price_adv")
-            with col3:
+            with c3:
                 new_main = st.number_input("Основной платёж", value=deal['price']['main_payment'], key="price_main")
 
             # Проверка расчётов
             if new_advance + new_main == new_price:
-                st.markdown("<div class='success-box'>✅ Расчёт сходится: Аванс + Основной = Цена</div>", unsafe_allow_html=True)
+                st.success("✅ Расчёт сходится: Аванс + Основной = Цена")
             else:
                 diff = new_price - (new_advance + new_main)
-                st.markdown(f"<div class='error-box'>❌ Расчёт не сходится: разница {diff:,} ₽</div>", unsafe_allow_html=True)
+                st.error(f"❌ Расчёт не сходится: разница {diff:,} ₽")
 
-            st.markdown("---")
-            st.markdown("#### 🏦 Эскроу")
+            st.divider()
+            st.subheader("🏦 Эскроу")
             st.text_input("Компания", value=deal['escrow']['company'], key="esc_comp")
             bank_options = ["ПАО СБЕРБАНК РОССИИ", "ПАО ВТБ", "АО «АЛЬФА-БАНК»", "Другой"]
-            selected_bank = st.selectbox("Банк", bank_options, index=bank_options.index(deal['escrow']['bank']) if deal['escrow']['bank'] in bank_options else 3, key="esc_bank")
-            if selected_bank == "Другой":
+            selected = st.selectbox("Банк", bank_options, 
+                                   index=bank_options.index(deal['escrow']['bank']) if deal['escrow']['bank'] in bank_options else 3, 
+                                   key="esc_bank")
+            if selected == "Другой":
                 st.text_input("Название банка", key="esc_bank_custom")
             st.text_input("БИК", value=deal['escrow']['bik'], key="esc_bik")
 
@@ -387,7 +344,7 @@ elif st.session_state.current_deal and st.session_state.current_deal != "new":
 # ═══════════════════════════════════════════════════════════════
 
 elif menu == "➕ Новая сделка" or st.session_state.current_deal == "new":
-    st.markdown("<div class='main-header'>➕ Новая сделка</div>", unsafe_allow_html=True)
+    st.title("➕ Новая сделка")
 
     step = st.session_state.new_deal_step
 
@@ -397,18 +354,18 @@ elif menu == "➕ Новая сделка" or st.session_state.current_deal == "
     for i, (col, step_name) in enumerate(zip(cols, steps)):
         with col:
             if i + 1 == step:
-                st.markdown(f"<div class='step-active'>{step_name}</div>", unsafe_allow_html=True)
+                st.info(f"**{step_name}**")  # Текущий шаг
             elif i + 1 < step:
-                st.markdown(f"<div class='step-inactive'>✓ {step_name}</div>", unsafe_allow_html=True)
+                st.success(f"✓ {step_name}")  # Пройден
             else:
-                st.markdown(f"<div class='step-inactive'>{step_name}</div>", unsafe_allow_html=True)
+                st.write(f"○ {step_name}")  # Ожидает
 
-    st.markdown("---")
+    st.divider()
 
     if step == 1:
-        st.markdown("### 📷 Шаг 1: Данные продавца")
-        col1, col2 = st.columns(2)
-        with col1:
+        st.subheader("📷 Шаг 1: Данные продавца")
+        c1, c2 = st.columns(2)
+        with c1:
             uploaded = st.file_uploader("Фото паспорта (разворот)", type=["jpg", "jpeg", "png"], key="seller_photo")
             if uploaded:
                 st.image(uploaded, width=300, caption="Загруженное фото")
@@ -420,25 +377,25 @@ elif menu == "➕ Новая сделка" or st.session_state.current_deal == "
                         "passport_series": "45 06",
                         "passport_number": "123456"
                     }
-        with col2:
-            st.markdown("#### Или введите вручную:")
+        with c2:
+            st.write("**Или введите вручную:**")
             s_fio = st.text_input("ФИО продавца", key="new_s_fio")
             s_bd = st.text_input("Дата рождения", key="new_s_bd")
-            col_s1, col_s2 = st.columns(2)
-            with col_s1:
+            c_s1, c_s2 = st.columns(2)
+            with c_s1:
                 s_ser = st.text_input("Серия", key="new_s_ser")
-            with col_s2:
+            with c_s2:
                 s_num = st.text_input("Номер", key="new_s_num")
             s_iss = st.text_input("Кем выдан", key="new_s_iss")
             s_id = st.text_input("Дата выдачи", key="new_s_id")
             s_addr = st.text_input("Адрес регистрации", key="new_s_addr")
 
-        col_btn1, col_btn2 = st.columns(2)
-        with col_btn1:
+        c_btn1, c_btn2 = st.columns(2)
+        with c_btn1:
             if st.button("◀️ Отмена", use_container_width=True):
                 st.session_state.current_deal = None
                 st.rerun()
-        with col_btn2:
+        with c_btn2:
             if st.button("Далее →", type="primary", use_container_width=True):
                 if s_fio:
                     st.session_state.new_deal_data['seller'] = {
@@ -450,88 +407,87 @@ elif menu == "➕ Новая сделка" or st.session_state.current_deal == "
                 st.rerun()
 
     elif step == 2:
-        st.markdown("### 📷 Шаг 2: Данные покупателя")
-        # Аналогично шагу 1...
-        col1, col2 = st.columns(2)
-        with col1:
+        st.subheader("📷 Шаг 2: Данные покупателя")
+        c1, c2 = st.columns(2)
+        with c1:
             uploaded = st.file_uploader("Фото паспорта покупателя", type=["jpg", "jpeg", "png"], key="buyer_photo")
             if uploaded:
                 st.image(uploaded, width=300)
                 st.success("✅ Распознано: Иванов Иван Иванович")
-        with col2:
+        with c2:
             b_fio = st.text_input("ФИО покупателя", key="new_b_fio")
             b_bd = st.text_input("Дата рождения", key="new_b_bd")
-            col_b1, col_b2 = st.columns(2)
-            with col_b1:
+            c_b1, c_b2 = st.columns(2)
+            with c_b1:
                 b_ser = st.text_input("Серия", key="new_b_ser")
-            with col_b2:
+            with c_b2:
                 b_num = st.text_input("Номер", key="new_b_num")
 
-        col_btn1, col_btn2, col_btn3 = st.columns(3)
-        with col_btn1:
+        c1, c2, c3 = st.columns(3)
+        with c1:
             if st.button("◀️ Назад", use_container_width=True):
                 st.session_state.new_deal_step = 1
                 st.rerun()
-        with col_btn2:
+        with c2:
             if st.button("Отмена", use_container_width=True):
                 st.session_state.current_deal = None
                 st.rerun()
-        with col_btn3:
+        with c3:
             if st.button("Далее →", type="primary", use_container_width=True):
                 st.session_state.new_deal_step = 3
                 st.rerun()
 
     elif step == 3:
-        st.markdown("### 🏠 Шаг 3: Объект недвижимости")
-        col1, col2 = st.columns(2)
-        with col1:
+        st.subheader("🏠 Шаг 3: Объект недвижимости")
+        c1, c2 = st.columns(2)
+        with c1:
             prop_addr = st.text_input("Адрес", key="new_prop_addr")
             prop_cad = st.text_input("Кадастровый номер", key="new_prop_cad")
-        with col2:
+        with c2:
             prop_area = st.number_input("Площадь (м²)", value=0.0, key="new_prop_area")
             prop_floor = st.number_input("Этаж", value=1, key="new_prop_floor")
 
         uploaded_egrn = st.file_uploader("Выписка ЕГРН", type=["jpg", "jpeg", "png", "pdf"], key="new_egrn")
 
-        col_btn1, col_btn2, col_btn3 = st.columns(3)
-        with col_btn1:
+        c1, c2, c3 = st.columns(3)
+        with c1:
             if st.button("◀️ Назад", use_container_width=True):
                 st.session_state.new_deal_step = 2
                 st.rerun()
-        with col_btn2:
+        with c2:
             if st.button("Отмена", use_container_width=True):
                 st.session_state.current_deal = None
                 st.rerun()
-        with col_btn3:
+        with c3:
             if st.button("Далее →", type="primary", use_container_width=True):
                 st.session_state.new_deal_step = 4
                 st.rerun()
 
     elif step == 4:
-        st.markdown("### 💰 Шаг 4: Цена")
+        st.subheader("💰 Шаг 4: Цена")
         price_total = st.number_input("Цена квартиры (₽)", value=0, step=100000, key="new_price")
 
         if price_total > 0:
             advance = int(price_total * 0.04)
             main = price_total - advance
-            col1, col2, col3 = st.columns(3)
-            with col1:
+            c1, c2, c3 = st.columns(3)
+            with c1:
                 st.metric("Аванс (4%)", f"{advance:,} ₽")
-            with col2:
+            with c2:
                 st.metric("Основной платёж", f"{main:,} ₽")
-            with col3:
+            with c3:
                 st.metric("Итого", f"{price_total:,} ₽")
 
-        col_btn1, col_btn2, col_btn3 = st.columns(3)
-        with col_btn1:
+        c1, c2, c3 = st.columns(3)
+        with c1:
             if st.button("◀️ Назад", use_container_width=True):
                 st.session_state.new_deal_step = 3
                 st.rerun()
-        with col_btn2:
+        with c2:
             if st.button("Отмена", use_container_width=True):
                 st.session_state.current_deal = None
                 st.rerun()
-        with col_btn3:
+        with c3:
             if st.button("Далее →", type="primary", use_container_width=True):
                 st.session_state.new_deal_data['price'] = {
                     "total": price_total,
@@ -542,22 +498,22 @@ elif menu == "➕ Новая сделка" or st.session_state.current_deal == "
                 st.rerun()
 
     elif step == 5:
-        st.markdown("### 🏦 Шаг 5: Банк для эскроу")
+        st.subheader("🏦 Шаг 5: Банк для эскроу")
         bank = st.selectbox("Выберите банк", ["Сбербанк", "ВТБ", "Альфа-Банк", "Другой"], key="new_bank")
         if bank == "Другой":
             st.text_input("Название банка", key="new_bank_custom")
             st.text_input("БИК", key="new_bik")
 
-        col_btn1, col_btn2, col_btn3 = st.columns(3)
-        with col_btn1:
+        c1, c2, c3 = st.columns(3)
+        with c1:
             if st.button("◀️ Назад", use_container_width=True):
                 st.session_state.new_deal_step = 4
                 st.rerun()
-        with col_btn2:
+        with c2:
             if st.button("Отмена", use_container_width=True):
                 st.session_state.current_deal = None
                 st.rerun()
-        with col_btn3:
+        with c3:
             if st.button("Далее →", type="primary", use_container_width=True):
                 bank_data = {
                     "Сбербанк": {"company": "ООО «Домклик»", "bank": "ПАО СБЕРБАНК РОССИИ", "bik": "044525225"},
@@ -569,41 +525,40 @@ elif menu == "➕ Новая сделка" or st.session_state.current_deal == "
                 st.rerun()
 
     elif step == 6:
-        st.markdown("### 🔍 Шаг 6: Проверка данных")
+        st.subheader("🔍 Шаг 6: Проверка данных")
 
         data = st.session_state.new_deal_data
 
         checks = [
-            ("Паспорт продавца", bool(data.get('seller')), "✅" if data.get('seller') else "❌"),
-            ("Паспорт покупателя", bool(data.get('buyer')), "✅" if data.get('buyer') else "❌"),
-            ("Объект недвижимости", bool(data.get('property')), "✅" if data.get('property') else "❌"),
-            ("Цена", bool(data.get('price')), "✅" if data.get('price') else "❌"),
-            ("Банк эскроу", bool(data.get('escrow')), "✅" if data.get('escrow') else "❌"),
+            ("Паспорт продавца", bool(data.get('seller'))),
+            ("Паспорт покупателя", bool(data.get('buyer'))),
+            ("Объект недвижимости", bool(data.get('property'))),
+            ("Цена", bool(data.get('price'))),
+            ("Банк эскроу", bool(data.get('escrow'))),
         ]
 
-        for name, status, icon in checks:
+        all_ok = True
+        for name, status in checks:
             if status:
-                st.markdown(f"<div class='success-box'>{icon} {name} — заполнено</div>", unsafe_allow_html=True)
+                st.success(f"✅ {name} — заполнено")
             else:
-                st.markdown(f"<div class='error-box'>{icon} {name} — не заполнено</div>", unsafe_allow_html=True)
+                st.error(f"❌ {name} — не заполнено")
+                all_ok = False
 
-        all_ok = all(status for _, status, _ in checks)
-
-        col_btn1, col_btn2, col_btn3 = st.columns(3)
-        with col_btn1:
+        c1, c2, c3 = st.columns(3)
+        with c1:
             if st.button("◀️ Назад", use_container_width=True):
                 st.session_state.new_deal_step = 5
                 st.rerun()
-        with col_btn2:
+        with c2:
             if st.button("Отмена", use_container_width=True):
                 st.session_state.current_deal = None
                 st.rerun()
-        with col_btn3:
+        with c3:
             if all_ok:
                 if st.button("📄 Сгенерировать ДКП", type="primary", use_container_width=True):
                     st.balloons()
                     st.success("✅ Договор успешно сгенерирован!")
-                    # Добавляем в список сделок
                     new_deal = {
                         "id": f"DKP-2026-{len(st.session_state.deals) + 43:04d}",
                         "status": "draft",
@@ -624,17 +579,17 @@ elif menu == "➕ Новая сделка" or st.session_state.current_deal == "
 # ═══════════════════════════════════════════════════════════════
 
 elif menu == "⚙️ Настройки":
-    st.markdown("<div class='main-header'>⚙️ Настройки</div>", unsafe_allow_html=True)
+    st.title("⚙️ Настройки")
 
     tab1, tab2, tab3 = st.tabs(["👤 Профиль", "🏦 Банки", "🔔 Уведомления"])
 
     with tab1:
-        col1, col2 = st.columns(2)
-        with col1:
+        c1, c2 = st.columns(2)
+        with c1:
             st.text_input("Имя", value="Олеся")
             st.text_input("Фамилия", value="")
             st.text_input("Телефон", value="+7 (999) 123-45-67")
-        with col2:
+        with c2:
             st.text_input("Email", value="olesya@example.com")
             st.selectbox("Роль", ["Риелтор", "Юрист", "Нотариус", "Частное лицо"])
             st.selectbox("Регион", ["Москва", "Московская область", "Санкт-Петербург", "Другой"])
@@ -642,7 +597,7 @@ elif menu == "⚙️ Настройки":
             st.success("✅ Профиль сохранён")
 
     with tab2:
-        st.markdown("#### 🏦 Банки по умолчанию")
+        st.subheader("🏦 Банки по умолчанию")
         st.selectbox("Основной банк", ["Сбербанк", "ВТБ", "Альфа-Банк", "Тинькофф", "Другой"])
         st.selectbox("Эскроу", ["Домклик", "Собственный счёт", "Другой"])
         st.text_input("Реквизиты по умолчанию")
@@ -650,7 +605,7 @@ elif menu == "⚙️ Настройки":
             st.success("✅ Настройки банков сохранены")
 
     with tab3:
-        st.markdown("#### 🔔 Уведомления")
+        st.subheader("🔔 Уведомления")
         st.toggle("Push-уведомления", value=True)
         st.toggle("Email-уведомления", value=True)
         st.toggle("SMS-уведомления", value=False)
@@ -663,10 +618,10 @@ elif menu == "⚙️ Настройки":
 # ═══════════════════════════════════════════════════════════════
 
 elif menu == "❓ Помощь":
-    st.markdown("<div class='main-header'>❓ Помощь</div>", unsafe_allow_html=True)
+    st.title("❓ Помощь")
 
     with st.expander("📱 Как пользоваться ботом?", expanded=True):
-        st.markdown("""
+        st.write("""
         **Telegram-бот @AvtoDKP1_bot:**
         1. Отправьте /start для начала
         2. Нажмите ➕ Новый ДКП
@@ -680,7 +635,7 @@ elif menu == "❓ Помощь":
         """)
 
     with st.expander("💻 Как пользоваться веб-приложением?"):
-        st.markdown("""
+        st.write("""
         **Веб-приложение (компьютер):**
         1. Выберите ➕ Новая сделка в меню
         2. Пройдите 6 шагов мастера
@@ -691,7 +646,7 @@ elif menu == "❓ Помощь":
         """)
 
     with st.expander("📄 Какие документы нужны?"):
-        st.markdown("""
+        st.write("""
         **Обязательные документы:**
         - Паспорт продавца (все страницы)
         - Паспорт покупателя (все страницы)
@@ -705,7 +660,7 @@ elif menu == "❓ Помощь":
         """)
 
     with st.expander("🔒 Безопасность данных"):
-        st.markdown("""
+        st.write("""
         - ✅ Все данные шифруются AES-256
         - ✅ Хранение в облаке с резервным копированием
         - ✅ Доступ только по авторизации
@@ -714,7 +669,7 @@ elif menu == "❓ Помощь":
         """)
 
     with st.expander("🆘 Техническая поддержка"):
-        st.markdown("""
+        st.write("""
         **Проблемы с ботом:**
         - Отправьте /reset для сброса состояния
         - Проверьте токен: @BotFather
