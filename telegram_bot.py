@@ -1,104 +1,118 @@
+"""
+🤖 АвтоДКP Lite — Минимальный бот для Render
+Только текстовый ввод, максимальная совместимость
+"""
+
 import os
-import time
 import json
 from datetime import datetime
-import requests
+from aiogram import Bot, Dispatcher, types
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
+from aiogram.utils import executor
 
 API_TOKEN = os.getenv("BOT_TOKEN", "8764706036:AAHJ0jrn1A0PwCBzldIvoyTx20FpCZd8ELg")
-API_URL = f"https://api.telegram.org/bot{API_TOKEN}"
 
-users = {}
+bot = Bot(token=API_TOKEN)
+storage = MemoryStorage()
+dp = Dispatcher(bot, storage=storage)
+
+# Хранилище сделок
 deals = {}
 
-def get_updates(offset=None):
-    params = {"timeout": 30}
-    if offset:
-        params["offset"] = offset
-    try:
-        r = requests.get(f"{API_URL}/getUpdates", params=params, timeout=35)
-        return r.json().get("result", [])
-    except:
-        return []
+class States(StatesGroup):
+    menu = State()
+    seller = State()
+    buyer = State()
+    property = State()
+    price = State()
+    bank = State()
+    confirm = State()
 
-def send_message(chat_id, text, reply_markup=None):
-    data = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
-    if reply_markup:
-        data["reply_markup"] = json.dumps(reply_markup)
-    try:
-        requests.post(f"{API_URL}/sendMessage", data=data, timeout=10)
-    except:
-        pass
+# Клавиатуры
+def main_kb():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add("➕ Новый ДКП", "📋 Мои сделки")
+    return kb
 
-def handle_message(msg):
-    chat_id = msg["chat"]["id"]
-    text = msg.get("text", "")
-    user_id = msg["from"]["id"]
-    
-    if user_id not in users:
-        users[user_id] = {"step": "menu", "deal": None}
-    
-    user = users[user_id]
-    
-    if text == "/start":
-        user["step"] = "menu"
-        send_message(chat_id, 
-            "👋 Привет! Я АвтоДКP\nСоздам договор купли-продажи\n\nНажмите ➕ Новый ДКП",
-            {"keyboard": [["➕ Новый ДКП"], ["📋 Мои сделки"]], "resize_keyboard": True}
-        )
-        return
-    
-    if user["step"] == "menu":
-        if text == "➕ Новый ДКП":
-            deal_id = f"DKP-{user_id}-{int(time.time())}"
-            deals[deal_id] = {"user": user_id, "date": datetime.now().isoformat()}
-            user["deal"] = deal_id
-            user["step"] = "seller"
-            send_message(chat_id, "👤 Введите ФИО продавца:")
-        elif text == "📋 Мои сделки":
-            user_deals = [k for k, v in deals.items() if v.get("user") == user_id]
-            if user_deals:
-                msg = "📋 Ваши сделки:\n"
-                for d in user_deals[-5:]:
-                    deal = deals[d]
-                    msg += f"\n🟡 {d}\nПродавец: {deal.get('seller', '—')}\n"
-                send_message(chat_id, msg)
-            else:
-                send_message(chat_id, "У вас пока нет сделок")
+def bank_kb():
+    kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    kb.add("🏦 Сбербанк", "🏦 ВТБ")
+    kb.add("🏦 Альфа-Банк")
+    return kb
+
+# Обработчики
+@dp.message_handler(commands=['start'])
+async def start(message: types.Message, state: FSMContext):
+    await state.finish()
+    await States.menu.set()
+    await message.answer(
+        "👋 Привет! Я АвтоДКP\n"
+        "Создам договор купли-продажи\n\n"
+        "Нажмите ➕ Новый ДКП",
+        reply_markup=main_kb()
+    )
+
+@dp.message_handler(state=States.menu)
+async def menu(message: types.Message, state: FSMContext):
+    text = message.text
+    if text == "➕ Новый ДКП":
+        deal_id = f"DKP-{message.from_user.id}-{int(datetime.now().timestamp())}"
+        await state.update_data(deal_id=deal_id)
+        deals[deal_id] = {"user": message.from_user.id, "date": datetime.now().isoformat()}
+        await States.seller.set()
+        await message.answer("👤 Введите ФИО продавца:")
+    elif text == "📋 Мои сделки":
+        user_deals = [k for k, v in deals.items() if v.get("user") == message.from_user.id]
+        if user_deals:
+            await message.answer(f"📋 Сделки: {len(user_deals)}")
         else:
-            send_message(chat_id, "Нажмите кнопку ➕ Новый ДКП")
-    
-    elif user["step"] == "seller":
-        deals[user["deal"]]["seller"] = text
-        user["step"] = "buyer"
-        send_message(chat_id, "👤 Введите ФИО покупателя:")
-    
-    elif user["step"] == "buyer":
-        deals[user["deal"]]["buyer"] = text
-        user["step"] = "address"
-        send_message(chat_id, "🏠 Введите адрес квартиры:")
-    
-    elif user["step"] == "address":
-        deals[user["deal"]]["address"] = text
-        user["step"] = "price"
-        send_message(chat_id, "💰 Введите цену (только цифры):")
-    
-    elif user["step"] == "price":
-        try:
-            price = int(text.replace(" ", "").replace("₽", ""))
-            deals[user["deal"]]["price"] = price
-            user["step"] = "bank"
-            send_message(chat_id, "🏦 Выберите банк:",
-                {"keyboard": [["🏦 Сбербанк", "🏦 ВТБ", "🏦 Альфа-Банк"]], "resize_keyboard": True}
-            )
-        except:
-            send_message(chat_id, "❌ Только цифры! Пример: 12500000")
-    
-    elif user["step"] == "bank":
-        banks = {"🏦 Сбербанк": "Сбербанк", "🏦 ВТБ": "ВТБ", "🏦 Альфа-Банк": "Альфа-Банк"}
-        if text in banks:
-            deal = deals[user["deal"]]
-            deal["bank"] = banks[text]
-            contract = f"""ДОГОВОР КУПЛИ-ПРОДАЖИ
+            await message.answer("Нет сделок")
+    else:
+        await message.answer("Нажмите кнопку")
+
+@dp.message_handler(state=States.seller)
+async def seller(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    deals[data["deal_id"]]["seller"] = message.text
+    await States.buyer.set()
+    await message.answer("👤 Введите ФИО покупателя:")
+
+@dp.message_handler(state=States.buyer)
+async def buyer(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    deals[data["deal_id"]]["buyer"] = message.text
+    await States.property.set()
+    await message.answer("🏠 Введите адрес:")
+
+@dp.message_handler(state=States.property)
+async def property_addr(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    deals[data["deal_id"]]["address"] = message.text
+    await States.price.set()
+    await message.answer("💰 Введите цену (только цифры):")
+
+@dp.message_handler(state=States.price)
+async def price(message: types.Message, state: FSMContext):
+    try:
+        price = int(message.text.replace(" ", ""))
+        data = await state.get_data()
+        deals[data["deal_id"]]["price"] = price
+        await States.bank.set()
+        await message.answer("🏦 Выберите банк:", reply_markup=bank_kb())
+    except:
+        await message.answer("❌ Только цифры!")
+
+@dp.message_handler(state=States.bank)
+async def bank(message: types.Message, state: FSMContext):
+    banks = {"🏦 Сбербанк": "Сбербанк", "🏦 ВТБ": "ВТБ", "🏦 Альфа-Банк": "Альфа-Банк"}
+    if message.text in banks:
+        data = await state.get_data()
+        deal = deals[data["deal_id"]]
+        deal["bank"] = banks[message.text]
+
+        contract = f"""ДОГОВОР КУПЛИ-ПРОДАЖИ
 
 Продавец: {deal.get("seller", "")}
 Покупатель: {deal.get("buyer", "")}
@@ -108,25 +122,18 @@ def handle_message(msg):
 
 Дата: {datetime.now().strftime("%d.%m.%Y")}
 """
-            deal["contract"] = contract
-            send_message(chat_id, 
-                f"✅ Договор готов!\n\n{contract}\n\nСохраните этот текст.",
-                {"keyboard": [["➕ Новый ДКП"], ["📋 Мои сделки"]], "resize_keyboard": True}
-            )
-            user["step"] = "menu"
-        else:
-            send_message(chat_id, "Выберите банк кнопкой")
+        deal["contract"] = contract
 
-def main():
+        await message.answer(f"✅ Договор готов!\n\n{contract}")
+        await States.menu.set()
+        await message.answer("Главное меню:", reply_markup=main_kb())
+    else:
+        await message.answer("Выберите банк кнопкой")
+
+@dp.message_handler()
+async def echo(message: types.Message):
+    await message.answer("Отправьте /start")
+
+if __name__ == '__main__':
     print("🤖 Бот запущен!")
-    offset = None
-    while True:
-        updates = get_updates(offset)
-        for update in updates:
-            offset = update["update_id"] + 1
-            if "message" in update:
-                handle_message(update["message"])
-        time.sleep(1)
-
-if __name__ == "__main__":
-    main()
+    executor.start_polling(dp, skip_updates=True)
