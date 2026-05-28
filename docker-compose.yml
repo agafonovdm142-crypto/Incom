@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+      - deals_data:/app/data
+    environment:
+      - DEBUG=False
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+    command: streamlit run web/web_app.py --server.port=8501 --server.address=0.0.0.0
+
+  bot:
+    build: .
+    volumes:
+      - .:/app
+      - deals_data:/app/data
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - PYTHONPATH=/app
+    command: python bot/telegram_bot.py
+    depends_on:
+      - web
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: autodkp
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-autodkp_pass}
+      POSTGRES_DB: autodkp
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres_data:
+  deals_data:
